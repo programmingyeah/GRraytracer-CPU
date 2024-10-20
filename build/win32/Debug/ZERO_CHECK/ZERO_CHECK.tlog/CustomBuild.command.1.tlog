@@ -1,0 +1,10 @@
+^C:\PROJECTS\GRRAYTRACER-CPU\BUILD\CMAKEFILES\3AC8AC35A8AC9BE07DDFB8461711D1AA\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/projects/GRraytracer-CPU -BC:/projects/GRraytracer-CPU/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/projects/GRraytracer-CPU/build/RelativisticRaymarcher.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
