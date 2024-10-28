@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Site BuildName="(empty)"
+	BuildStamp="20241028-2230-Experimental"
+	Name="(empty)"
+	Generator="ctest-3.31.0-rc1"
+	CompilerName=""
+	CompilerVersion=""
+	OSName="Windows"
+	Hostname="DESKTOP-QDJA6KC"
+	OSRelease=" Personal"
+	OSVersion=" (Build 19045)"
+	OSPlatform="AMD64"
+	Is64Bits="1"
+	VendorString="AuthenticAMD"
+	VendorID="Advanced Micro Devices"
+	FamilyID="15"
+	ModelID="1"
+	ModelName="AMD Ryzen 5 3600 6-Core Processor              "
+	ProcessorCacheSize="64"
+	NumberOfLogicalCPU="12"
+	NumberOfPhysicalCPU="6"
+	TotalVirtualMemory="37580"
+	TotalPhysicalMemory="32716"
+	LogicalProcessorsPerPhysical="2"
+	ProcessorClockFrequency="3593"
+	>
+	<Testing>
+		<StartDateTime>Oct 28 23:30 W. Europe Standard Time</StartDateTime>
+		<StartTestTime>1730154600</StartTestTime>
+		<TestList/>
+		<EndDateTime>Oct 28 23:30 W. Europe Standard Time</EndDateTime>
+		<EndTestTime>1730154600</EndTestTime>
+		<ElapsedMinutes>0</ElapsedMinutes>
+	</Testing>
+</Site>

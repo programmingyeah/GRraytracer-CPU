@@ -6,6 +6,8 @@ int main() {
     const int numFrames = 1;
     double c = 299792458.0;
 
+    loadHDRSkybox("../../resources/rogland_clear_night_4k.hdr");
+
     glm::vec3 cameraVelocity(0.0f, 0.0f, 0.0f);
 
     for (int frame = 0; frame < numFrames; ++frame) {

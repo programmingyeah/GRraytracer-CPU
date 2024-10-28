@@ -3,11 +3,46 @@
 #include <iostream>
 #include <cmath>
 #include <string>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
+#define PI 3.14159265
 
 const double MAX_DIST = 100.0f;
 const int MAX_STEPS = 100;
 const double EPSILON = 0.001f;
+
+float* hdrData = nullptr;
+int hdrWidth, hdrHeight, hdrChannels;
+
+bool loadHDRSkybox(const char* hdrPath) {
+    hdrData = stbi_loadf(hdrPath, &hdrWidth, &hdrHeight, &hdrChannels, 3);
+    if (!hdrData) {
+        std::cerr << "Failed to load HDR image: " << hdrPath << std::endl;
+        return false;
+    }
+    return true;
+}
+
+glm::vec3 sampleHDRSkybox(const glm::dvec3& dir) {
+    // Calculate spherical coordinates from direction vector
+    double phi = atan2(dir.z, dir.x);
+    double theta = acos(dir.y);
+
+    // Convert to UV coordinates
+    double u = (phi + PI) / (2.0 * PI);  // Map phi from [-π, π] to [0, 1]
+    double v = theta / PI;                 // Map theta from [0, π] to [0, 1]
+
+    // Convert UV to pixel coordinates
+    int px = static_cast<int>(u * hdrWidth) % hdrWidth;
+    int py = static_cast<int>(v * hdrHeight) % hdrHeight;
+
+    // Sample color from HDR data
+    int index = (py * hdrWidth + px) * 3;
+    return glm::vec3(hdrData[index], hdrData[index + 1], hdrData[index + 2]);
+}
 
 struct State {
     glm::dvec4 pos;
@@ -20,8 +55,11 @@ public:
     float ***gamma;   
     float **g;        
     State *s;   
+    Ray* ray;
 
     Data() {
+        ray = new Ray();
+
         s = new State();
 
         gamma = new float**[4];
@@ -56,6 +94,8 @@ public:
         delete[] g;
 
         delete s;
+
+        delete ray;
     }
 };
 
@@ -95,9 +135,9 @@ double sdfSphere(glm::dvec3*& p, glm::dvec3 center, double radius) {
 }
 
 double sceneSDF(glm::dvec3*& p) {
-    double dist1 = sdfSphere(p, glm::dvec3(0, 0, -3), 2.0f);
-    double dist2 = sdfSphere(p, glm::dvec3(2, 0, -3), 2.0f);
-    return dist1;
+    double dist1 = sdfSphere(p, glm::dvec3(0, 0, 6), 2.0f);
+    double dist2 = sdfSphere(p, glm::dvec3(2, 0, 6), 2.0f);
+    return std::min(dist1,dist2);
 }
 
 glm::dmat4 Metric(State*& s) {
@@ -224,54 +264,53 @@ void Integrate(State*& s, double dt) {
     State k4 = GeodesicEquation(h3);*/
     //to switch to rk4, uncomment previous comment and comment out the euler updating in exchange for rk4 updating
     
-    (*s).vel += dt * k1.vel;
-    (*s).pos += dt * k1.pos; //note that k1.pos is the velocity as k1 is a derivative
+    s->vel += dt * k1.vel;
+    s->pos += dt * k1.pos; //note that k1.pos is the velocity as k1 is a derivative
     //s.pos = s.pos + (dt / 6.0) * (k1.pos + 2.0 * k2.pos + 2.0 * k3.pos + k4.pos);
     //s.vel = s.vel + (dt / 6.0) * (k1.vel + 2.0 * k2.vel + 2.0 * k3.vel + k4.vel);
 }
 
-glm::vec3 raymarch(const Ray& ray, const glm::vec3& cameraVelocity, double speedOfLight, Data*& data) {
+glm::vec3 raymarch(Data*& data, double speedOfLight) {
     double dt = 0.1;
 
-    (*(*data).s).pos = (glm::dvec4) glm::vec4(0,ray.origin);
-    (*(*data).s).vel = (glm::dvec4) glm::vec4(1,ray.direction);
+    data->s->pos = (glm::dvec4) glm::vec4(0, data->ray->origin);
+    data->s->vel = (glm::dvec4) glm::vec4(1, data->ray->direction);
 
     for (int i = 0; i < MAX_STEPS; i++) {
-        glm::dvec3* p = &glm::dvec3((*(*data).s).pos.x,(*(*data).s).pos.y,(*(*data).s).pos.z);
+        glm::dvec3* p = &glm::dvec3(data->s->pos.y, data->s->pos.z, data->s->pos.w);
         double dist = sceneSDF(p);
         if (dist < EPSILON) {
-            return glm::vec3(1.0f, 1.0f, 1.0f);
+            return glm::vec3(1.0f, 1.0f, 1.0f);  // Return white if an object is hit
         }
 
-        (*(*data).s).pos += (*(*data).s).vel * dt;
+        data->s->pos += data->s->vel * dt;
     }
 
-    return glm::vec3(1.0f, 0.0f, 0.0f);
+    // If no object is hit, return skybox color based on the final direction
+    return sampleHDRSkybox(data->ray->direction);
 }
 
 void renderFrame(int frameNumber, const glm::vec3& cameraVelocity, double speedOfLight) {
     int width = 800;
-    int height = 600;
+    int height = 800;  // Set height equal to width for a 1:1 aspect ratio
 
     std::vector<unsigned char> image(width * height * 3);
 
     glm::vec3 cameraPos(0, 0, 0);  
 
-    Data* data = new Data(); //reusable memory chunk to hold important data
+    Data* data = new Data(); // reusable memory chunk to hold important data
+    data->ray->origin = cameraPos;
 
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
-            double u = (x / (double)width) * 2.0f - 1.0f;
-            double v = (y / (double)height) * 2.0f - 1.0f;
+            // Normalize pixel coordinates (u, v) to the range [-1, 1]
+            double u = (2.0 * x / (double)(width - 1)) - 1.0;
+            double v = (2.0 * y / (double)(height - 1)) - 1.0;
 
-            glm::vec3 rayDir = glm::normalize(glm::vec3(u, v, 1.0f));
+            data->ray->direction = glm::normalize(glm::vec3(u, -v, 1.0f));
 
-            Ray ray;
-            ray.origin = cameraPos;
-            ray.direction = rayDir;
-
-
-            glm::vec3 color = raymarch(ray, cameraVelocity, speedOfLight, data);
+            // Perform raymarching to get the color
+            glm::vec3 color = raymarch(data, speedOfLight);
 
             int index = (y * width + x) * 3;
             image[index] = static_cast<unsigned char>(color.r * 255);
@@ -280,8 +319,13 @@ void renderFrame(int frameNumber, const glm::vec3& cameraVelocity, double speedO
         }
     }
 
-    std::ofstream file("../../output/frame" + std::to_string(frameNumber) + ".ppm");
-    file << "P6\n" << width << " " << height << "\n255\n";
-    file.write(reinterpret_cast<char*>(&image[0]), image.size());
-    file.close();
+    // Create a filename with the frame number and .png extension
+    std::string filename = "../../output/frame" + std::to_string(frameNumber) + ".png";
+
+    // Use stb_image_write to save the file as PNG
+    if (stbi_write_png(filename.c_str(), width, height, 3, image.data(), width * 3)) {
+        std::cout << "Saved " << filename << " successfully.\n";
+    } else {
+        std::cerr << "Failed to save " << filename << ".\n";
+    }
 }
